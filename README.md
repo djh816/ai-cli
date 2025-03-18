@@ -84,9 +84,9 @@ Available models include:
 - `-q, --quiet`: Do not print AI responses (only works with voice output)
 - `-m, --model <MODEL>`: The AI model to use (default: "o3-mini")
 - `-w, --words <WORDS>`: Maximum number of words for web search (default: 500)
-- `-g, --image-generation   Enable image generation mode (incompatible with interactive and voice modes)
-- `-s, --size <SIZE>        Image size (1024x1024, 1024x1792, 1792x1024) [default: 1024x1024]
-- `    --quality <QUALITY>  Image quality (standard, hd) [default: standard]
-- `    --style <STYLE>      Image style (vivid, natural) [default: vivid]
+- `-g, --image-generation`: Enable image generation mode (incompatible with interactive and voice modes)
+- `-s, --size <SIZE>`: Image size (1024x1024, 1024x1792, 1792x1024) [default: 1024x1024]
+- `    --quality <QUALITY>`: Image quality (standard, hd) [default: standard]
+- `    --style <STYLE>`: Image style (vivid, natural) [default: vivid]
 - `-h, --help`: Print help
 - `-V, --version`: Print version 
