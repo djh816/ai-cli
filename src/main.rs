@@ -217,7 +217,6 @@ async fn initialize_conversation(client: &Client, api_key: &str, prompt: &str) -
         let text = response.text().await?;
         
         if status.as_u16() == 401 {
-            // API key is invalid, prompt for a new one
             let new_api_key: String = Input::<String>::new()
                 .with_prompt("Invalid API key. Please enter a new one")
                 .allow_empty(false)
@@ -226,7 +225,6 @@ async fn initialize_conversation(client: &Client, api_key: &str, prompt: &str) -
             let keyring = Entry::new(SERVICE_NAME, USERNAME)?;
             keyring.set_password(&new_api_key)?;
             
-            // Try again with the new key using Box::pin to avoid infinite recursion
             Box::pin(initialize_conversation(client, &new_api_key, prompt)).await
         } else {
             Err(anyhow!("Error communicating with conversation API: {} - {}", status, text))
@@ -272,7 +270,7 @@ async fn chat_with_ai(
         }
 
         let mut stream = response.bytes_stream();
-        let mut full_response = String::new();
+        let mut full_response = String::with_capacity(1024);
 
         while let Some(item) = stream.next().await {
             let chunk = item?;
@@ -300,7 +298,6 @@ async fn chat_with_ai(
         let text = response.text().await?;
         
         if status.as_u16() == 401 {
-            // API key is invalid, prompt for a new one
             let new_api_key: String = Input::<String>::new()
                 .with_prompt("Invalid API key. Please enter a new one")
                 .allow_empty(false)
@@ -309,7 +306,6 @@ async fn chat_with_ai(
             let keyring = Entry::new(SERVICE_NAME, USERNAME)?;
             keyring.set_password(&new_api_key)?;
             
-            // Try again with the new key using Box::pin to avoid infinite recursion
             Box::pin(chat_with_ai(
                 client, 
                 &new_api_key, 
@@ -359,7 +355,6 @@ async fn generate_image(client: &Client, api_key: &str, prompt: &str, model: &st
 
     if response.status().is_success() {
         let response_text = response.text().await?;
-        
         let image_response: ImageGenerationResponse = serde_json::from_str(&response_text)?;
         
         if image_response.aiRecord.status != "SUCCESS" {
@@ -368,18 +363,15 @@ async fn generate_image(client: &Client, api_key: &str, prompt: &str, model: &st
         
         println!("Image generated successfully. Downloading...");
         
-        // Get the image URL from the temporaryUrl field
         if image_response.aiRecord.temporaryUrl.is_empty() {
             return Err(anyhow!("No image URL found in response"));
         }
         
-        // Extract the filename from the URL
         let url = &image_response.aiRecord.temporaryUrl;
         let filename = url.split('?').next()
             .and_then(|path| path.split('/').last())
             .unwrap_or(DEFAULT_IMAGE_FILENAME);
         
-        // Download the image
         let image_bytes = client
             .get(url)
             .send()
@@ -387,7 +379,6 @@ async fn generate_image(client: &Client, api_key: &str, prompt: &str, model: &st
             .bytes()
             .await?;
             
-        // Save the image to a file
         let path = Path::new(filename);
         let mut file = File::create(path)?;
         file.write_all(&image_bytes)?;
@@ -399,7 +390,6 @@ async fn generate_image(client: &Client, api_key: &str, prompt: &str, model: &st
         let text = response.text().await?;
         
         if status.as_u16() == 401 {
-            // API key is invalid, prompt for a new one
             let new_api_key: String = Input::<String>::new()
                 .with_prompt("Invalid API key. Please enter a new one")
                 .allow_empty(false)
@@ -408,14 +398,11 @@ async fn generate_image(client: &Client, api_key: &str, prompt: &str, model: &st
             let keyring = Entry::new(SERVICE_NAME, USERNAME)?;
             keyring.set_password(&new_api_key)?;
             
-            // Try again with the new key
             Box::pin(generate_image(client, &new_api_key, prompt, model, size, quality, style)).await
         } else {
-            // Try to parse the error message from JSON
             let error_message = match serde_json::from_str::<serde_json::Value>(&text) {
                 Ok(json) => {
                     if let Some(message) = json.get("message").and_then(|m| m.as_str()) {
-                        // Remove any leading error code numbers (like "400 ")
                         if let Some(space_pos) = message.find(' ') {
                             if message[..space_pos].parse::<u32>().is_ok() {
                                 message[space_pos+1..].to_string()
@@ -440,8 +427,6 @@ async fn generate_image(client: &Client, api_key: &str, prompt: &str, model: &st
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-
-    // Create HTTP client
     let client = Client::new();
 
     match &cli.command {
@@ -454,8 +439,7 @@ async fn main() -> Result<()> {
 
     let api_key = get_api_key().await?;
 
-    // Check for incompatible flags
-    let mut errors = Vec::new();
+    let mut errors = Vec::with_capacity(3);
     
     if cli.quiet && !cli.voice_output {
         errors.push("Quiet mode requires voice output to be enabled.");
@@ -473,11 +457,9 @@ async fn main() -> Result<()> {
         return Err(anyhow!("{}", errors.join("\nError: ")));
     }
 
-    // Handle image generation mode
     if cli.image_generation {
         match &cli.prompt {
             Some(prompt) => {
-                // Use DALLE-3 as default for image generation if not specified
                 let model = if cli.model == DEFAULT_MODEL {
                     DEFAULT_IMAGE_MODEL
                 } else {
@@ -493,7 +475,6 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Regular chat mode continues below
     let prompt = match &cli.prompt {
         Some(p) => p.as_str(),
         None => "",
@@ -544,7 +525,6 @@ async fn main() -> Result<()> {
                 ).await?;
             }
             None => {
-                // Show help instead of error message
                 Cli::command().print_help()?;
                 return Ok(());
             }
